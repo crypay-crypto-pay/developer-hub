@@ -31,14 +31,16 @@ Redirect your customer to `link`. Crypay handles crypto selection, address gener
 | [Error Codes](docs/api/errors.md) | Error codes and recovery guidance |
 | [OpenAPI Schema](docs/api/openapi.yaml) | Machine-readable spec (OpenAPI 3.0) |
 
-### Render the OpenAPI spec locally
+### Browse the OpenAPI spec interactively
+
+**[Open in Swagger UI](https://petstore.swagger.io/?url=https://raw.githubusercontent.com/crypay-crypto-pay/developer-hub/main/docs/api/openapi.yaml)**
+
+Or render locally:
 
 ```bash
 npx @redocly/cli preview-docs docs/api/openapi.yaml
 # Open http://localhost:8080
 ```
-
-Or use the hosted version: **[crypay.com/developers](https://crypay.com/developers)**
 
 ---
 
@@ -64,11 +66,11 @@ Or use the hosted version: **[crypay.com/developers](https://crypay.com/develope
 
 ---
 
-## Supported Cryptocurrencies
+## Supported Currencies
 
-Crypay supports BTC (mainnet + Lightning), ETH, and other major networks. Use `GET /payments/{id}/options` to list all options available for a payment.
+**Fiat (invoice currency):** EUR, USD, CZK, GBP, HUF
 
-**Supported fiat currencies:** EUR, USD, CZK, GBP, HUF
+**Crypto:** BTC (mainnet + Lightning), ETH, and more. Call `GET /payments/{id}/options` to list all options at current exchange rates.
 
 ---
 
