@@ -1,54 +1,60 @@
-# Payments API Reference
+# Payments — API Reference
 
-**Base path:** `/api/payments`
+Base URL: `https://api.crypay.com`
+
+All endpoints require the `X-API-KEY` header. See [Authentication](authentication.md).
 
 ---
 
 ## Create Payment
 
 ```
-POST /api/payments
+POST /payments
 ```
 
-Creates a new payment request. Returns a `shortId` you can use to redirect the customer to the hosted payment page.
+Creates a new payment session. Returns a hosted payment link to redirect your customer to.
 
-**Authentication:** API Key (`PAYMENT` scope) or JWT
+### Request Headers
+
+| Header | Required | Value |
+|---|---|---|
+| `X-API-KEY` | Yes | Your merchant API key |
+| `Content-Type` | Yes | `application/json` |
 
 ### Request Body
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `amount` | number | Yes | Amount to charge (e.g. `19.99`) |
-| `currency` | string | Yes | Fiat currency code (`EUR`, `USD`, `CZK`, …) |
-| `reference` | string | No | Your internal order ID |
-| `description` | string | No | Free-text description shown on the payment page |
-| `successUrl` | string | No | Redirect URL after successful payment |
-| `failUrl` | string | No | Redirect URL if the customer cancels or payment expires |
-| `paymentUpdateWebhook` | string | No | URL to receive payment state change events |
-| `paymentUpdateWebhookSecret` | string | No | Secret used to sign outbound webhook payloads |
-| `selectionTimeout` | integer | No | Seconds the customer has to pick a coin (default: `600`) |
-| `paymentTimeout` | integer | No | Seconds the payment address stays valid (default: `3600`) |
-| `language` | string | No | UI language (`EN`, `SK`, …) |
-| `multi` | boolean | No | Allow payment to be used multiple times |
-| `options` | array | No | Pre-select which cryptocurrencies to offer |
-| `test` | boolean | No | Mark as test payment (only visible in test mode) |
-| `merchant` | object | No | Override merchant details for this payment |
-| `customer` | object | No | Attach customer info (name, email, registration number) |
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `amount` | number | Yes | — | Payment amount (must be > 0) |
+| `currency` | string | Yes | — | Fiat currency: `EUR`, `USD`, `CZK`, `GBP`, `HUF` |
+| `reference` | string | Yes | — | Your order/invoice reference |
+| `paymentTimeout` | number | No | `3600` | Seconds the customer has to pay after selecting a crypto |
+| `selectionTimeout` | number | No | `null` | Seconds to select a crypto (null = no limit) |
+| `successUrl` | string | No | `null` | Redirect URL on successful payment |
+| `failUrl` | string | No | `null` | Redirect URL on expired/failed payment |
+| `language` | string | No | `null` | UI language: `SK`, `EN` |
+| `multi` | boolean | No | `false` | Allow multiple payment options simultaneously |
+| `options` | array | No | `[]` | Restrict to specific crypto options (see below) |
+| `test` | boolean | No | `false` | Use testnet networks only |
+| `description` | string | No | `null` | Free-text payment description |
+| `merchant` | object | No | — | Issuer details (see below) |
+| `customer` | object | No | — | Customer details (see below) |
+| `paymentUpdateWebhook` | string | No | `null` | URL to POST status updates to |
+| `paymentUpdateWebhookSecret` | string | No | `null` | HMAC secret for signing webhook payloads |
 
 #### `options` item
 
 ```json
-{ "symbol": "BTC", "network": "bitcoin" }
+{ "symbol": "BTC", "network": "BITCOIN" }
 ```
 
 #### `merchant` object
 
 ```json
 {
-  "name": "Acme Corp",
+  "name": "Acme s.r.o.",
   "registrationNumber": "12345678",
-  "address": "123 Main St, Prague",
-  "email": "billing@acme.com"
+  "address": "Hlavná 1, 811 01 Bratislava"
 }
 ```
 
@@ -56,236 +62,199 @@ Creates a new payment request. Returns a `shortId` you can use to redirect the c
 
 ```json
 {
-  "name": "Jane Doe",
-  "email": "jane@example.com",
-  "registrationNumber": null
+  "name": "Ján Novák",
+  "registrationNumber": "87654321",
+  "email": "jan@example.com"
 }
 ```
 
-### Example Request
-
-```bash
-curl -X POST https://app.crypay.com/api/payments \
-  -H "X-API-KEY: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "amount": 49.90,
-    "currency": "EUR",
-    "reference": "INV-2026-042",
-    "description": "Order #42 — Running shoes",
-    "successUrl": "https://shop.example.com/success",
-    "failUrl": "https://shop.example.com/cancel",
-    "paymentUpdateWebhook": "https://shop.example.com/webhooks/crypay",
-    "paymentUpdateWebhookSecret": "whs_super_secret_value"
-  }'
-```
-
-### Response — `NEW` payment
+### Response — 201 Created
 
 ```json
 {
-  "id": "507f1f77bcf86cd799439011",
-  "userId": "507f1f77bcf86cd799439012",
-  "shortId": "abc123de",
-  "state": "NEW",
-  "created": "2026-05-05T10:00:00.000Z",
-  "amount": 49.90,
-  "currency": "EUR",
-  "currencyDecimals": 2,
-  "reference": "INV-2026-042",
-  "description": "Order #42 — Running shoes",
-  "settlementOption": "DIRECT",
-  "transactions": [],
-  "offered": null,
-  "started": null,
-  "symbolDecimals": null
+  "id": "abc123xyz456",
+  "link": "https://pay.crypay.com/abc123xyz456"
 }
 ```
 
-Redirect the customer to `https://app.crypay.com/pay/{shortId}`.
+Redirect the customer to `link`.
+
+### Errors
+
+| HTTP | Code | Description |
+|---|---|---|
+| 400 | `INVALID_CURRENCY` | Currency not supported |
+| 400 | `MAX_PAYMENTS_LIMIT` | Too many concurrent active payments (limit: 100) |
 
 ---
 
 ## Get Payment
 
 ```
-GET /api/payments/:shortId
+GET /payments/{id}
 ```
 
-Returns the full payment object. No authentication required — use this to poll for state changes from a frontend.
+Returns the current state of a payment.
 
-### Response — `WAITING_FOR_PAYMENT`
+### Response — 200 OK
 
 ```json
 {
-  "id": "507f1f77bcf86cd799439011",
-  "shortId": "abc123de",
+  "id": "abc123xyz456",
   "state": "WAITING_FOR_PAYMENT",
-  "amount": 49.90,
+  "amount": 49.99,
   "currency": "EUR",
-  "symbol": "BTC",
-  "network": "bitcoin",
-  "address": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
-  "paymentAmount": 0.00125000,
-  "exchangeRate": 39920,
-  "fee": 0.00001,
-  "symbolDecimals": 8,
-  "memo": null,
+  "currencyDecimals": 2,
+  "reference": "ORDER-001",
+  "created": "2026-05-05T10:00:00.000Z",
   "offered": "2026-05-05T10:02:00.000Z",
   "started": "2026-05-05T10:05:00.000Z",
-  "transactions": []
+  "language": "EN",
+  "selectionTimeout": null,
+  "paymentTimeout": 3600,
+  "test": false,
+  "redirectUrl": null,
+  "description": null,
+  "settlementOption": "DIRECT",
+  "link": "https://pay.crypay.com/abc123xyz456",
+  "merchant": null,
+  "customer": null,
+  "address": "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq",
+  "symbol": "BTC",
+  "symbolDecimals": 8,
+  "network": "BITCOIN",
+  "paymentAmount": 0.00078,
+  "baseSymbol": "EUR",
+  "memo": null,
+  "paid": 0,
+  "paidConfirmed": 0,
+  "paidUnconfirmed": 0,
+  "overpaid": 0,
+  "remaining": 0.00078
 }
 ```
 
----
+### Payment States
 
-## List Payments
+| State | Description |
+|---|---|
+| `NEW` | Created, waiting for customer to select a cryptocurrency |
+| `WAITING_FOR_PAYMENT` | Crypto selected, address assigned, waiting for on-chain transaction |
+| `WAITING_FOR_CONFIRMATION` | Transaction seen on-chain, waiting for confirmations |
+| `SUCCESS` | Payment confirmed — fulfil the order |
+| `EXPIRED` | Payment timed out before completion |
 
-```
-GET /api/payments
-```
+### Errors
 
-Returns a paginated list of payments belonging to the authenticated merchant.
-
-**Authentication:** API Key (`PAYMENT` scope) or JWT
-
-### Query Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `limit` | integer | `25` | Results per page (1–50) |
-| `offset` | integer | `0` | Pagination offset |
-| `order` | string | `created:desc` | Sort field and direction. Fields: `created`, `reference`, `amount`, `state`, `paymentAmount` |
-| `term` | string | — | Full-text search across reference, short ID, description |
-| `dateFrom` | string | — | Filter from date (`YYYY-MM-DD`) |
-| `dateTo` | string | — | Filter to date (`YYYY-MM-DD`) |
-| `states` | string | — | Comma-separated states: `NEW,WAITING_FOR_PAYMENT,WAITING_FOR_CONFIRMATION,SUCCESS,EXPIRED` |
-| `currencies` | string | — | Comma-separated fiat currencies: `EUR,USD` |
-| `symbols` | string | — | Comma-separated crypto symbols: `BTC,ETH` |
-| `ids` | string | — | Comma-separated `shortId` values |
-| `test` | boolean | — | `true` to show only test payments |
-
-### Example
-
-```bash
-curl "https://app.crypay.com/api/payments?states=SUCCESS&dateFrom=2026-05-01&limit=10" \
-  -H "X-API-KEY: YOUR_API_KEY"
-```
+| HTTP | Code | Description |
+|---|---|---|
+| 404 | `PAYMENT_NOT_FOUND` | Payment ID does not exist |
 
 ---
 
-## Get Payment Options
+## List Payment Options
 
 ```
-GET /api/payments/:shortId/options
+GET /payments/{id}/options
 ```
 
-Lists available cryptocurrencies for a `NEW` payment, with current exchange rates.
-
-**Authentication:** None
+Returns available cryptocurrencies and their equivalent amounts for a `NEW` payment.
 
 ### Query Parameters
 
 | Parameter | Default | Description |
-|-----------|---------|-------------|
-| `limit` | `25` | Options per page (1–50) |
-| `afterSymbol` | — | Cursor for next page (pass last `symbol` from previous response) |
+|---|---|---|
+| `limit` | `25` | Items per page (1–50) |
+| `afterSymbol` | — | Cursor for next page |
 
-### Response
+### Response — 200 OK
 
 ```json
-[
-  {
-    "symbol": "BTC",
-    "network": "bitcoin",
-    "decimals": 8,
-    "baseSymbol": "EUR",
-    "paymentAmount": 0.00125000,
-    "exchangeRate": 39920,
-    "originalExchangeRate": 39920,
-    "fee": 0.00001,
-    "disabled": false
-  },
-  {
-    "symbol": "ETH",
-    "network": "ethereum",
-    "decimals": 18,
-    "baseSymbol": "EUR",
-    "paymentAmount": 0.01640000,
-    "exchangeRate": 3043,
-    "originalExchangeRate": 3043,
-    "fee": 0.0005,
-    "disabled": false
-  }
-]
+{
+  "totalCount": 12,
+  "items": [
+    {
+      "symbol": "BTC",
+      "network": "BITCOIN",
+      "decimals": 8,
+      "baseSymbol": "EUR",
+      "paymentAmount": 0.00078,
+      "exchangeRate": 64102.5,
+      "originalExchangeRate": 64050.0
+    }
+  ]
+}
 ```
+
+`exchangeRate` includes the Crypay processing fee; `originalExchangeRate` does not.
+
+### Errors
+
+| HTTP | Code | Description |
+|---|---|---|
+| 404 | `PAYMENT_NOT_FOUND` | Payment not found |
+| 400 | `INVALID_PAYMENT_STATE` | Payment not in `NEW` state |
+| 400 | `PAYMENT_EXPIRED` | Selection timeout exceeded |
 
 ---
 
 ## Select Payment Option
 
 ```
-POST /api/payments/:shortId/set-option
+POST /payments/{id}/set-option
 ```
 
-Assigns a cryptocurrency to the payment and generates a deposit address. The state moves to `WAITING_FOR_PAYMENT`.
-
-**Authentication:** None (called from the customer's browser)
+Locks in the cryptocurrency the customer chose. After this call, a deposit address is assigned and the payment moves to `WAITING_FOR_PAYMENT`.
 
 ### Request Body
 
 ```json
 {
   "symbol": "BTC",
-  "network": "bitcoin"
+  "network": "BITCOIN"
 }
 ```
 
-### Response
+### Response — 204 No Content
 
-`204 No Content`
+### Errors
 
----
-
-## Payment States
-
-| State | Meaning | Terminal |
-|-------|---------|----------|
-| `NEW` | Created, awaiting option selection | No |
-| `WAITING_FOR_PAYMENT` | Address assigned, awaiting transaction | No |
-| `WAITING_FOR_CONFIRMATION` | Transaction detected, awaiting confirmations | No |
-| `SUCCESS` | Fully confirmed | Yes |
-| `EXPIRED` | Timed out before payment arrived | Yes |
+| HTTP | Code | Description |
+|---|---|---|
+| 404 | `PAYMENT_NOT_FOUND` | Payment not found |
+| 400 | `INVALID_PAYMENT_STATE` | Payment not in `NEW` state |
+| 400 | `INVALID_PAYMENT_OPTION` | Symbol/network combination not valid |
+| 400 | `PAYMENT_EXPIRED` | Selection timeout exceeded |
 
 ---
 
-## Supported Symbols
+## List My Payments
 
 ```
-GET /api/symbols
+GET /payments
 ```
 
-Returns all symbols supported as payment options.
+Returns a paginated list of your payments.
 
-```bash
-curl https://app.crypay.com/api/symbols
-```
+### Query Parameters
+
+| Parameter | Default | Description |
+|---|---|---|
+| `limit` | `25` | Items per page (1–50) |
+| `offset` | `0` | Pagination offset |
+| `order` | `created:desc` | Sort: `created|reference|amount|state` + `:asc|:desc` |
+| `term` | — | Search term |
+| `dateFrom` | — | `YYYY-MM-DD` start date |
+| `dateTo` | — | `YYYY-MM-DD` end date |
+| `states` | — | Comma-separated states |
+| `currencies` | — | Comma-separated fiat currencies |
+| `test` | — | `true` or `false` |
+
+### Response — 200 OK
 
 ```json
-[
-  {
-    "code": "BTC",
-    "decimals": 8,
-    "type": "CRYPTO",
-    "networks": [
-      {
-        "code": "bitcoin",
-        "type": "MAINNET",
-        "native": true,
-        "useMemo": false,
-        "contractAddress": null
-      }
-    ]
-  }
-]
+{
+  "totalCount": 42,
+  "items": [/* payment objects */]
+}
 ```

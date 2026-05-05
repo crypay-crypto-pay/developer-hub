@@ -1,46 +1,32 @@
-# cURL Examples
+# curl Examples
 
-Standalone bash scripts for common Crypay API operations.
+Standalone bash scripts using curl. No dependencies beyond `bash`, `curl`, and `python3` (for JSON pretty-printing).
 
-## Requirements
+## Setup
 
-- `bash` 4+
-- `curl`
-- `openssl`
-- `python3` (for JSON pretty-printing)
+```bash
+export CRYPAY_API_KEY=your_api_key
+# For testnet: export CRYPAY_BASE_URL=https://api.crypay.com
+```
 
 ## Scripts
 
 | Script | Description |
-|--------|-------------|
-| `create-payment.sh` | Create a payment and print the customer payment URL |
-| `verify-webhook.sh` | Simulate a Crypay webhook and verify its HMAC signature |
+|---|---|
+| `create-payment.sh` | Create a payment and print the checkout link |
+| `get-payment.sh <id>` | Fetch current payment status |
+| `list-options.sh <id>` | List available cryptocurrencies for a NEW payment |
 
-## Quick Start
+## Example
 
 ```bash
-export CRYPAY_API_KEY="your_api_key_here"
-bash create-payment.sh
+# 1. Create a payment
+./create-payment.sh
+# → Checkout link: https://pay.crypay.com/abc123xyz456
+
+# 2. Check its status
+./get-payment.sh abc123xyz456
+
+# 3. See available crypto options (while state is NEW)
+./list-options.sh abc123xyz456
 ```
-
-Expected output:
-
-```
-Creating payment...
-{
-    "shortId": "abc123de",
-    "state": "NEW",
-    ...
-}
-
-Payment created: abc123de
-Payment URL:     https://app.crypay.com/pay/abc123de
-
-Available payment options:
-  BTC    (bitcoin     )    0.00050000  @ 39,920.00 EUR/coin
-  ETH    (ethereum    )    0.00660000  @  3,029.00 EUR/coin
-```
-
-## Test Mode
-
-Run in test mode by using an API key created while your account has **Test Mode** enabled in Settings. Test payments never touch real blockchains.

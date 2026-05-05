@@ -1,91 +1,94 @@
-# Quick Start — Create a Payment in 5 Minutes
+# Quickstart — Create a Payment in 5 Minutes
 
-This guide walks you through creating a cryptocurrency payment using the Crypay API.
+This guide walks you through creating a Crypay payment and receiving a webhook confirmation.
 
 ## Prerequisites
 
-- A [Crypay account](https://app.crypay.com/register)
-- An API key (see [Authentication](authentication.md))
+- A Crypay merchant account → [crypay.com](https://crypay.com)
+- Your **API key** from the merchant dashboard
 
-## Step 1 — Create an API Key
+---
 
-1. Log in to [app.crypay.com](https://app.crypay.com)
-2. Go to **Settings → API Keys → New Key**
-3. Name your key and select the **PAYMENT** scope
-4. Copy both the `apiKey` and `secretKey` — the secret is shown only once
-
-## Step 2 — Create a Payment
+## Step 1 — Create a payment
 
 ```bash
-curl -X POST https://app.crypay.com/api/payments \
+curl -X POST https://api.crypay.com/payments \
   -H "X-API-KEY: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "amount": 19.99,
+    "amount": 49.99,
     "currency": "EUR",
     "reference": "ORDER-001",
-    "successUrl": "https://yourshop.com/success",
-    "failUrl": "https://yourshop.com/cancel",
-    "paymentUpdateWebhook": "https://yourshop.com/webhook/crypay",
-    "paymentUpdateWebhookSecret": "your-webhook-secret"
+    "paymentUpdateWebhook": "https://yoursite.com/webhooks/crypay"
   }'
 ```
 
-You'll receive a payment object:
+**Response (201 Created):**
 
 ```json
 {
-  "id": "507f1f77bcf86cd799439011",
-  "shortId": "abc123de",
-  "state": "NEW",
-  "amount": 19.99,
-  "currency": "EUR",
-  "reference": "ORDER-001",
-  "created": "2026-05-05T10:00:00.000Z"
+  "id": "abc123xyz456",
+  "link": "https://pay.crypay.com/abc123xyz456"
 }
 ```
 
-## Step 3 — Redirect the Customer
+---
 
-Send your customer to the payment page using the `shortId`:
+## Step 2 — Redirect your customer
 
-```
-https://app.crypay.com/pay/{shortId}
-```
+Send the customer to `link`. They'll see available cryptocurrencies, select one, and receive a payment address.
 
-The customer selects their preferred cryptocurrency. The payment state transitions to `WAITING_FOR_PAYMENT` and an address is assigned.
+---
 
-## Step 4 — Receive a Webhook
+## Step 3 — Handle the webhook
 
-When payment is confirmed, Crypay sends a POST request to your `paymentUpdateWebhook` URL:
+When the payment status changes, Crypay POSTs to your `paymentUpdateWebhook` URL:
 
 ```json
 {
-  "paymentId": "507f1f77bcf86cd799439011",
+  "paymentId": "abc123xyz456",
   "reference": "ORDER-001",
   "status": "SUCCESS",
-  "amount": 19.99,
+  "amount": 49.99,
   "currency": "EUR",
   "symbol": "BTC",
-  "network": "bitcoin",
-  "paymentAmount": 0.00050123
+  "network": "BITCOIN",
+  "paymentAmount": 0.00078
 }
 ```
 
-Verify the `X-SIGNATURE` header before fulfilling the order (see [Webhooks](webhooks.md)).
+Possible `status` values: `WAITING_FOR_PAYMENT` → `WAITING_FOR_CONFIRMATION` → `SUCCESS` (or `EXPIRED`).
 
-## Payment States
+Verify the request is authentic before fulfilling the order:
 
-| State | Meaning |
-|-------|---------|
-| `NEW` | Created, customer has not selected a coin yet |
-| `WAITING_FOR_PAYMENT` | Crypto address assigned, awaiting on-chain transaction |
-| `WAITING_FOR_CONFIRMATION` | Transaction seen, waiting for block confirmations |
-| `SUCCESS` | Confirmed — safe to fulfill the order |
-| `EXPIRED` | Payment window closed before payment arrived |
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhook(rawBody, signature, secret) {
+  const expected = crypto
+    .createHmac('sha256', Buffer.from(secret, 'utf-8'))
+    .update(Buffer.from(rawBody, 'utf-8'))
+    .digest('hex');
+  return expected.toLowerCase() === signature.toLowerCase();
+}
+```
+
+---
+
+## Step 4 — Verify on the Crypay side (optional)
+
+```bash
+curl https://api.crypay.com/payments/abc123xyz456 \
+  -H "X-API-KEY: YOUR_API_KEY"
+```
+
+Check the `state` field: `NEW` → `WAITING_FOR_PAYMENT` → `WAITING_FOR_CONFIRMATION` → `SUCCESS`.
+
+---
 
 ## Next Steps
 
-- [Full payment reference](payments.md) — all fields, list/filter, option selection
-- [Webhook verification](webhooks.md) — HMAC, retry policy, best practices
-- [Error codes](errors.md) — handling edge cases
+- [Authentication](authentication.md) — API key details and HMAC signing
+- [Payments reference](payments.md) — full request/response schema
+- [Webhooks](webhooks.md) — retry policy, security headers
+- [Examples](../../examples/curl/) — ready-to-run curl scripts

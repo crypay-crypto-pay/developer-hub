@@ -1,0 +1,527 @@
+openapi: 3.0.3
+info:
+  title: Crypay Merchant API
+  description: |
+    Accept cryptocurrency payments. Create a payment, get a hosted checkout link,
+    and receive webhook updates when status changes.
+
+    **Base URL:** `https://api.crypay.com`
+
+    **Authentication:** All endpoints require an `X-API-KEY` header.
+    Obtain your key from the [Crypay merchant dashboard](https://crypay.com).
+  version: "1.0.0"
+  contact:
+    name: Crypay Support
+    email: support@crypay.com
+    url: https://crypay.com/developers
+
+servers:
+  - url: https://api.crypay.com
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+
+  schemas:
+    PaymentCreateRequest:
+      type: object
+      required:
+        - amount
+        - currency
+        - reference
+      properties:
+        amount:
+          type: number
+          format: float
+          minimum: 0.000001
+          example: 49.99
+          description: Payment amount in the specified fiat currency.
+        currency:
+          type: string
+          enum: [EUR, USD, CZK, GBP, HUF]
+          example: EUR
+          description: Fiat currency for the payment.
+        reference:
+          type: string
+          example: "ORDER-001"
+          description: Your order or invoice reference (returned in webhooks).
+        paymentTimeout:
+          type: integer
+          default: 3600
+          example: 3600
+          description: Seconds the customer has to pay after selecting a cryptocurrency.
+        selectionTimeout:
+          type: integer
+          nullable: true
+          default: null
+          description: Seconds the customer has to select a cryptocurrency. Null means no limit.
+        successUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://yoursite.com/order/success"
+          description: Redirect URL after successful payment.
+        failUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://yoursite.com/order/cancelled"
+          description: Redirect URL after expired or failed payment.
+        language:
+          type: string
+          enum: [SK, EN]
+          nullable: true
+          description: UI language for the hosted checkout page.
+        multi:
+          type: boolean
+          default: false
+          description: Allow the customer to pay with multiple options simultaneously.
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentOption'
+          default: []
+          description: Restrict available cryptocurrencies. Empty array means all supported options.
+        test:
+          type: boolean
+          default: false
+          description: Use testnet networks only.
+        description:
+          type: string
+          nullable: true
+          example: "Annual subscription"
+        merchant:
+          $ref: '#/components/schemas/MerchantInfo'
+        customer:
+          $ref: '#/components/schemas/CustomerInfo'
+        paymentUpdateWebhook:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://yoursite.com/webhooks/crypay"
+          description: URL to receive POST status updates.
+        paymentUpdateWebhookSecret:
+          type: string
+          nullable: true
+          description: HMAC-SHA256 secret for signing webhook deliveries.
+
+    PaymentCreateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "abc123xyz456"
+          description: Unique payment identifier (12 characters).
+        link:
+          type: string
+          format: uri
+          example: "https://pay.crypay.com/abc123xyz456"
+          description: Hosted checkout URL. Redirect your customer here.
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "abc123xyz456"
+        state:
+          type: string
+          enum: [NEW, WAITING_FOR_PAYMENT, WAITING_FOR_CONFIRMATION, SUCCESS, EXPIRED]
+          example: WAITING_FOR_PAYMENT
+        amount:
+          type: number
+          example: 49.99
+        currency:
+          type: string
+          example: EUR
+        currencyDecimals:
+          type: integer
+          example: 2
+        reference:
+          type: string
+          example: "ORDER-001"
+        created:
+          type: string
+          format: date-time
+        offered:
+          type: string
+          format: date-time
+          nullable: true
+        started:
+          type: string
+          format: date-time
+          nullable: true
+        language:
+          type: string
+          nullable: true
+        selectionTimeout:
+          type: integer
+          nullable: true
+        paymentTimeout:
+          type: integer
+          nullable: true
+        test:
+          type: boolean
+        link:
+          type: string
+          format: uri
+        address:
+          type: string
+          nullable: true
+          example: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"
+        symbol:
+          type: string
+          nullable: true
+          example: BTC
+        symbolDecimals:
+          type: integer
+          nullable: true
+          example: 8
+        network:
+          type: string
+          nullable: true
+          example: BITCOIN
+        paymentAmount:
+          type: number
+          nullable: true
+          example: 0.00078
+        memo:
+          type: string
+          nullable: true
+        paid:
+          type: number
+          example: 0
+        paidConfirmed:
+          type: number
+          example: 0
+        paidUnconfirmed:
+          type: number
+          example: 0
+        overpaid:
+          type: number
+          example: 0
+        remaining:
+          type: number
+          example: 0.00078
+
+    PaymentOptionItem:
+      type: object
+      properties:
+        symbol:
+          type: string
+          example: BTC
+        network:
+          type: string
+          example: BITCOIN
+        decimals:
+          type: integer
+          example: 8
+        baseSymbol:
+          type: string
+          example: EUR
+        paymentAmount:
+          type: number
+          example: 0.00078
+        exchangeRate:
+          type: number
+          example: 64102.5
+          description: Rate with processing fee applied.
+        originalExchangeRate:
+          type: number
+          example: 64050.0
+          description: Raw market rate without fee.
+
+    PaymentOption:
+      type: object
+      required:
+        - symbol
+        - network
+      properties:
+        symbol:
+          type: string
+          example: BTC
+        network:
+          type: string
+          example: BITCOIN
+
+    MerchantInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        registrationNumber:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+
+    CustomerInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        registrationNumber:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+
+    PaginatedPayments:
+      type: object
+      properties:
+        totalCount:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Payment'
+
+    PaginatedOptions:
+      type: object
+      properties:
+        totalCount:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentOptionItem'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Payment not found"
+        status:
+          type: integer
+          example: 404
+        details:
+          type: object
+          properties:
+            reason:
+              type: string
+              example: PAYMENT_NOT_FOUND
+
+paths:
+  /payments:
+    post:
+      operationId: createPayment
+      summary: Create a payment
+      description: |
+        Creates a hosted payment session. Returns a `link` to redirect your customer to.
+        The customer selects their preferred cryptocurrency and pays. Crypay handles
+        address generation, confirmation tracking, and webhook delivery.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreateRequest'
+            example:
+              amount: 49.99
+              currency: EUR
+              reference: ORDER-001
+              paymentUpdateWebhook: https://yoursite.com/webhooks/crypay
+              paymentUpdateWebhookSecret: your-webhook-secret
+      responses:
+        '201':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentCreateResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_currency:
+                  value:
+                    error: "Currency not supported"
+                    status: 400
+                    details:
+                      reason: INVALID_CURRENCY
+                max_limit:
+                  value:
+                    error: "Maximum active payments limit reached"
+                    status: 400
+                    details:
+                      reason: MAX_PAYMENTS_LIMIT
+                      limit: 100
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      operationId: listPayments
+      summary: List my payments
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 25
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: order
+          in: query
+          schema:
+            type: string
+            example: "created:desc"
+        - name: term
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: states
+          in: query
+          schema:
+            type: string
+            example: "SUCCESS,EXPIRED"
+        - name: test
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated list of payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPayments'
+
+  /payments/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        example: abc123xyz456
+    get:
+      operationId: getPayment
+      summary: Get payment
+      responses:
+        '200':
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/{id}/options:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: listPaymentOptions
+      summary: List available cryptocurrencies for a payment
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 25
+            minimum: 1
+            maximum: 50
+        - name: afterSymbol
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Available crypto options with exchange rates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOptions'
+        '400':
+          description: Invalid payment state or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /payments/{id}/set-option:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: selectPaymentOption
+      summary: Select cryptocurrency for payment
+      description: |
+        Locks in the chosen cryptocurrency. Crypay assigns a deposit address
+        and transitions the payment to `WAITING_FOR_PAYMENT`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentOption'
+            example:
+              symbol: BTC
+              network: BITCOIN
+      responses:
+        '204':
+          description: Option selected; address assigned
+        '400':
+          description: Invalid state, option, or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

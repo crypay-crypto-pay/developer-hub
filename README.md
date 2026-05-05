@@ -1,54 +1,79 @@
 # Crypay Developer Hub
 
-Accept cryptocurrency payments on your website or application using the Crypay API.
+Accept cryptocurrency payments with a single API call.
 
-**Base URL:** `https://app.crypay.com/api`
+**[crypay.com](https://crypay.com)** · [API Docs](#api-documentation) · [Examples](#examples) · [Eshop Modules](#eshop-modules)
 
 ---
 
-## Contents
+## Quick Start
 
-| Section | Description |
-|---------|-------------|
-| [Quick Start](docs/api/quickstart.md) | Create your first payment in 5 minutes |
-| [Authentication](docs/api/authentication.md) | API keys, signatures, and security |
+```bash
+curl -X POST https://api.crypay.com/payments \
+  -H "X-API-KEY: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 49.99, "currency": "EUR", "reference": "ORDER-001"}'
+# → {"id": "abc123xyz456", "link": "https://pay.crypay.com/abc123xyz456"}
+```
+
+Redirect your customer to `link`. Crypay handles crypto selection, address generation, confirmation tracking, and webhook delivery.
+
+---
+
+## API Documentation
+
+| Document | Description |
+|---|---|
+| [Quickstart](docs/api/quickstart.md) | Create your first payment in 5 minutes |
+| [Authentication](docs/api/authentication.md) | API key setup and HMAC signing |
 | [Payments](docs/api/payments.md) | Full payment endpoint reference |
-| [Webhooks](docs/api/webhooks.md) | Receive real-time payment updates |
-| [Errors](docs/api/errors.md) | Error codes and recovery guidance |
-| [OpenAPI Schema](openapi.yaml) | Machine-readable API spec (Redoc / Swagger UI) |
+| [Webhooks](docs/api/webhooks.md) | Receive payment status updates |
+| [Error Codes](docs/api/errors.md) | Error codes and recovery guidance |
+| [OpenAPI Schema](docs/api/openapi.yaml) | Machine-readable spec (OpenAPI 3.0) |
 
-## Integration Examples
+### Render the OpenAPI spec locally
 
-| Language | Path |
-|----------|------|
-| cURL (bash) | [examples/curl/](examples/curl/) |
-| Node.js | [examples/node/](examples/node/) |
-| Python | [examples/python/](examples/python/) |
-| PHP | [examples/php/](examples/php/) |
+```bash
+npx @redocly/cli preview-docs docs/api/openapi.yaml
+# Open http://localhost:8080
+```
+
+Or use the hosted version: **[crypay.com/developers](https://crypay.com/developers)**
+
+---
+
+## Examples
+
+| Example | Directory |
+|---|---|
+| curl (bash) | [examples/curl/](examples/curl/) |
+| Node.js (axios) | [examples/node/](examples/node/) *(Phase 2)* |
+| Python (requests) | [examples/python/](examples/python/) *(Phase 2)* |
+| PHP (Guzzle) | [examples/php/](examples/php/) *(Phase 2)* |
+
+---
 
 ## Eshop Modules
 
-| Platform | Path | Status |
-|----------|------|--------|
-| WooCommerce | [modules/woocommerce/](modules/woocommerce/) | Available |
-| Shopify | [modules/shopify/](modules/shopify/) | Coming soon |
-| PrestaShop | [modules/prestashop/](modules/prestashop/) | Planned |
-| Magento | [modules/magento/](modules/magento/) | Planned |
+| Module | Directory | Status |
+|---|---|---|
+| WooCommerce | [modules/woocommerce/](modules/woocommerce/) | Phase 3 |
+| Shopify | [modules/shopify/](modules/shopify/) | Phase 4 |
+| PrestaShop | [modules/prestashop/](modules/prestashop/) | Phase 4 |
+| Magento | [modules/magento/](modules/magento/) | Phase 4 |
 
 ---
 
-## Getting Started
+## Supported Cryptocurrencies
 
-1. [Create a free Crypay account](https://app.crypay.com/register)
-2. Generate an API key in **Settings → API Keys**
-3. Follow the [Quick Start guide](docs/api/quickstart.md)
+Crypay supports BTC (mainnet + Lightning), ETH, and other major networks. Use `GET /payments/{id}/options` to list all options available for a payment.
+
+**Supported fiat currencies:** EUR, USD, CZK, GBP, HUF
+
+---
 
 ## Support
 
 - Email: support@crypay.com
-- Website: [crypay.com](https://crypay.com)
-- Issues: [GitHub Issues](https://github.com/crypay-crypto-pay/developer-hub/issues)
-
-## Contributing
-
-Pull requests for examples, translations, and module improvements are welcome. Please open an issue first for larger changes.
+- Docs: [crypay.com/developers](https://crypay.com/developers)
+- Issues: [github.com/crypay-crypto-pay/developer-hub/issues](https://github.com/crypay-crypto-pay/developer-hub/issues)
